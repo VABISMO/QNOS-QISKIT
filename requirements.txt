@@ -1,0 +1,6 @@
+pyserial>=3.5
+opencv-python>=4.9.0
+numpy>=1.26.0
+click>=8.1.0
+click-help-colors>=0.9.1
+qiskit>=1.2.0
