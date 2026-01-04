@@ -15,9 +15,8 @@ The system uses a 64-qubit array (8x8 grid) hosted on a PMMA substrate with hBN 
 ## Hardware Requirements
 The system requires custom hardware assembly. Below is a detailed Bill of Materials (BOM) based on the components list.
 
-### Bill of Materials (BOM)
 
-## Bill of Materials (BOM)
+## Materials
 
 | Nº   | Component                           | Reference | Value / Model                        | Quantity | Main Function                                                                     | Typical Footprint (KiCad)     | Notes / Important Observations                                                                    |
 |------|-------------------------------------|-----------|--------------------------------------|----------|-----------------------------------------------------------------------------------|-------------------------------|---------------------------------------------------------------------------------------------------|
