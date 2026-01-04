@@ -124,15 +124,25 @@ The FPGA firmware is provided in top_level.v (Verilog). Synthesize and program i
 Run the CLI tool:
 ```bash
 python qn.py --help
-python qn.py calculate-period 15 --a 2 --port /dev/ttyUSB0
+python qn.py period 15 --a 2 --port /dev/ttyUSB0
 
 ```
+
+<img width="585" height="225" alt="image" src="https://github.com/user-attachments/assets/a5d33a2a-fdba-4f9b-83d9-ac408fb166d6" />
+
 ## Calibration
 
-```ash
+```bash
 python qn.py calibrate --port /dev/ttyUSB0
 ```
 
+## Simulator 
+
+Add flag ```--mock-hardware``` to command 
+
+```bash 
+python qn.py period 15 --a 2 --mock-hardware
+```
 ## Development
 
 Tests: Located in tests/ directory. Run with pytest tests/.
