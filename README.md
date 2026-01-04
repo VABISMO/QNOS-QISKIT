@@ -111,7 +111,7 @@ Prerequisites:
 Clone the repository:
 
 ```bash
-git clone https://github.com/your-repo/qnos.git
+git clone https://github.com/VABISMO/QNOS-QISKIT.git
 cd qnos
 pip install -r requirements.txt
 ```
@@ -129,7 +129,7 @@ python qnos.py calculate-period 15 --a 2 --port /dev/ttyUSB0
 ## Calibration
 
 ```ash
-python qnos.py calibrate --port /dev/ttyUSB0
+python qn.py calibrate --port /dev/ttyUSB0
 ```
 
 ## Development
@@ -139,8 +139,5 @@ Customization: Extend QFTHardwareBackend for other circuits. Adjust parameters i
 Limitations: This is a proof-of-concept; real quantum coherence in hBN defects requires cryogenic conditions and advanced error correction, not implemented here.
 
 ## License
-MIT License. See LICENSE file for details.
-Acknowledgments
+APACHE 2 - Non Comercial
 
-Inspired by quantum optics research on color centers in 2D materials.
-Uses Qiskit for quantum circuit abstraction.
