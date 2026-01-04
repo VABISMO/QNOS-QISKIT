@@ -1,4 +1,4 @@
-# QNOS: Qiskit Solid-State Spin Defects 
+# QNOS: Qiskit Backend for Solid-State Spin Defects 
 (WIP)
 QNOS (Quantum Number Operating System) is a hardware-software framework for demonstrating quantum computing principles using spin defects like hexagonal Boron Nitride (hBN) , NV Diamosnd, SiC or Quarz oxigen vacacy as qubits. This project integrates an FPGA-based control system with a laser array for excitation, a camera for optical readout, and microwave pulses for qubit manipulation. It specializes in Quantum Fourier Transform (QFT) for period finding in number theory problems, such as Shor's algorithm components.
 
