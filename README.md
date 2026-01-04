@@ -124,8 +124,8 @@ The FPGA firmware is provided in top_level.v (Verilog). Synthesize and program i
 ## Usage
 Run the CLI tool:
 ```bash
-python qnos.py --help
-python qnos.py calculate-period 15 --a 2 --port /dev/ttyUSB0
+python qn.py --help
+python qn.py calculate-period 15 --a 2 --port /dev/ttyUSB0
 
 ```
 ## Calibration
