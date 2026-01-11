@@ -5,11 +5,15 @@ QNOS is a hardware-software framework for demonstrating quantum computing princi
 The system uses a 64-qubit array (8x8 grid) hosted on a PMMA substrate with hBN defects. Control is achieved via an Xilinx Artix-7 FPGA, with Python software for high-level operations, including integration with Qiskit for circuit simulation on hardware.
 
 ## Features
-- **Hardware Control**: FPGA-managed laser firing, camera capture, and microwave pulse generation.
-- **Calibration**: Automatic mapping of laser positions to camera pixels for accurate qubit addressing.
-- **Qubit Readout**: Optical fluorescence detection using image processing to determine qubit states.
-- **QFT Specialization**: Implements QFT-based period finding for integers, approximating quantum phase estimation.
-- **CLI Interface**: Command-line tool for calibration and calculations using Click.
+- **Educational Simulation**: Explicit "Honest Simulator" mode for verifying quantum concepts without false claims.
+- **Factor-15 Demo**: Guaranteed-to-work 8-qubit demonstration of Shor's algorithm for factoring 15 = 3 × 5.
+- **Hardware Abstraction Layer**: Unified interface for:
+  - **Cameras**: FPGA (OV7670), USB, CSI (IMX477), and Scientific CCDs.
+  - **Lasers**: VCSEL arrays, LEDs, and Fiber-coupled sources.
+- **High-Resolution Scaling**: Support for consumer 100MP+ sensors (Sony IMX461, Samsung HP1) enabling simulated grids up to 48×48 qubits.
+- **Auto-Calibration & Diagnostics**: Automated tools for mapping laser spots to pixels and verifying hardware health.
+- **QFT Specialization**: Implements QFT-based period finding for integers.
+- **CLI Interface**: Robust command-line tools for calibration, diagnostics, and algorithm demonstration.
 - **Modular Design**: Separate PCBs for main logic and VCSEL array, with optical setup for hBN substrate.
 
 ## Hardware Requirements
