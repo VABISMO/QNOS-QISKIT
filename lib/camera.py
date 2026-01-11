@@ -18,12 +18,40 @@ logger = logging.getLogger(__name__)
 
 # Camera presets for common sensors
 CAMERA_PRESETS = {
-    'OV7670': {'resolution': (480, 640), 'type': 'cmos', 'max_grid': (8, 8)},
-    'IMX477': {'resolution': (3040, 4056), 'type': 'cmos', 'max_grid': (16, 16)},
-    'ICX618ALA': {'resolution': (480, 640), 'type': 'ccd', 'max_grid': (8, 8), 'notes': 'Sony CCD, bare sensor'},
+    # FPGA-based (low resolution)
+    'OV7670': {'resolution': (480, 640), 'type': 'cmos', 'max_grid': (8, 8), 'notes': 'VGA module'},
+    
+    # Entry-level high-res
+    'IMX477': {'resolution': (3040, 4056), 'type': 'cmos', 'max_grid': (16, 16), 'notes': 'RPi HQ 12.3MP'},
+    'IMX519': {'resolution': (3496, 4656), 'type': 'cmos', 'max_grid': (16, 16), 'notes': 'Arducam 16MP autofocus'},
+    
+    # Consumer high megapixel (DSLR/Mirrorless)
+    'IMX571': {'resolution': (4176, 6244), 'type': 'cmos', 'max_grid': (24, 24), 'notes': 'Sony 26MP APS-C'},
+    'IMX455': {'resolution': (6192, 8256), 'type': 'cmos', 'max_grid': (32, 32), 'notes': 'Sony 61MP Full-Frame'},
+    'IMX461': {'resolution': (6384, 8736), 'type': 'cmos', 'max_grid': (36, 36), 'notes': 'Sony 100MP Medium Format'},
+    
+    # Smartphone high-res (direct sensor boards)
+    'ISOCELL_HP1': {'resolution': (9248, 12000), 'type': 'cmos', 'max_grid': (48, 48), 'notes': 'Samsung 200MP'},
+    'ISOCELL_HP3': {'resolution': (9248, 12000), 'type': 'cmos', 'max_grid': (48, 48), 'notes': 'Samsung 200MP compact'},
+    'IMX989': {'resolution': (6000, 8000), 'type': 'cmos', 'max_grid': (32, 32), 'notes': 'Sony 50MP 1-inch'},
+    
+    # Scientific/Industrial CCD
+    'ICX618ALA': {'resolution': (480, 640), 'type': 'ccd', 'max_grid': (8, 8), 'notes': 'Sony CCD bare sensor'},
     'ICX274AL': {'resolution': (1200, 1600), 'type': 'ccd', 'max_grid': (12, 12), 'notes': 'Sony CCD 2MP'},
-    'MT9P031': {'resolution': (1944, 2592), 'type': 'cmos', 'max_grid': (14, 14), 'notes': 'Aptina 5MP'},
-    'AR0130': {'resolution': (960, 1280), 'type': 'cmos', 'max_grid': (10, 10), 'notes': 'ON Semi 1.2MP global shutter'},
+    'KAF-50100': {'resolution': (6132, 8176), 'type': 'ccd', 'max_grid': (32, 32), 'notes': 'Kodak 50MP CCD'},
+    
+    # Gigapixel arrays (tiled sensors)
+    'GPIXEL_GMAX3265': {'resolution': (6464, 9216), 'type': 'cmos', 'max_grid': (36, 36), 'notes': '65MP global shutter'},
+    'GPIXEL_GMAX0505': {'resolution': (4608, 5120), 'type': 'cmos', 'max_grid': (24, 24), 'notes': '25MP high-speed'},
+}
+
+# Resolution tiers for auto-selection
+RESOLUTION_TIERS = {
+    'basic': (480, 640),        # 8x8 grid max
+    'standard': (1080, 1920),   # 12x12 grid max
+    'high': (3040, 4056),       # 16x16 grid max
+    'ultra': (6192, 8256),      # 32x32 grid max
+    'extreme': (9248, 12000),   # 48x48 grid max (200MP)
 }
 
 
