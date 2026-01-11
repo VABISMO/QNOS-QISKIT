@@ -17,7 +17,7 @@ class FPGAConnection:
     """
     def __init__(self, port: str = '/dev/ttyUSB0', baudrate: int = 115200):
         try:
-            self.ser = serial.Serial(port, baudrate, timeout=5)  # Increased timeout
+            self.ser = serial.Serial(port, baudrate, timeout=60)  # Increased timeout for reliable image transfer
             time.sleep(2)
             logger.info("FPGA connected.")
         except serial.SerialException as e:
@@ -137,14 +137,18 @@ class MicrowaveController:
         phase_val = int((phase / (2 * pi)) * mod) % mod
         output_div = 1  # RF divider
         power_level = int(amp * 3) - 4 + 4  # -4 to +5 dBm
+        # Firmware only accepts 5 arguments and has a 64-byte buffer limit.
+        # Registers are calculated here for reference but not sent to avoid overflow.
+        # The firmware currently uses internal placeholder logic for SPI.
         regs = [
-            hex((n << 15) | frac),  # R0
-            hex((phase_val << 15) | (mod << 3) | 1),  # R1 fixed prescaler=0, phase adjust=0
-            hex(0x000004B3),  # R2 default
-            hex(0x0000000C),  # R3 default
-            hex((output_div << 8) | (power_level << 3) | 0x00580005),  # R4 with power
-            hex(0x00800025)   # R5 default
+            hex((n << 15) | frac),
+            hex((phase_val << 15) | (mod << 3) | 1),
+            hex(0x000004B3),
+            hex(0x0000000C),
+            hex((output_div << 8) | (power_level << 3) | 0x00580005),
+            hex(0x00800025)
         ]
         qubit_str = str(qubit) if isinstance(qubit, int) else f"{qubit[0]}_{qubit[1]}"
-        command = f"APPLY_PULSE {qubit_str} {freq_ghz} {amp} {duration_ns} {phase} " + " ".join(regs)
+        # command = f"APPLY_PULSE {qubit_str} {freq_ghz} {amp} {duration_ns} {phase} " + " ".join(regs)
+        command = f"APPLY_PULSE {qubit_str} {freq_ghz} {amp} {duration_ns} {phase}"
         return self.fpga.send_command(command)

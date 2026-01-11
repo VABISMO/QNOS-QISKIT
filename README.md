@@ -5,11 +5,15 @@ QNOS is a hardware-software framework for demonstrating quantum computing princi
 The system uses a 64-qubit array (8x8 grid) hosted on a PMMA substrate with hBN defects. Control is achieved via an Xilinx Artix-7 FPGA, with Python software for high-level operations, including integration with Qiskit for circuit simulation on hardware.
 
 ## Features
-- **Hardware Control**: FPGA-managed laser firing, camera capture, and microwave pulse generation.
-- **Calibration**: Automatic mapping of laser positions to camera pixels for accurate qubit addressing.
-- **Qubit Readout**: Optical fluorescence detection using image processing to determine qubit states.
-- **QFT Specialization**: Implements QFT-based period finding for integers, approximating quantum phase estimation.
-- **CLI Interface**: Command-line tool for calibration and calculations using Click.
+- **Educational Simulation**: Explicit "Honest Simulator" mode for verifying quantum concepts without false claims.
+- **Factor-15 Demo**: Guaranteed-to-work 8-qubit demonstration of Shor's algorithm for factoring 15 = 3 × 5.
+- **Hardware Abstraction Layer**: Unified interface for:
+  - **Cameras**: FPGA (OV7670), USB, CSI (IMX477), and Scientific CCDs.
+  - **Lasers**: VCSEL arrays, LEDs, and Fiber-coupled sources.
+- **High-Resolution Scaling**: Support for consumer 100MP+ sensors (Sony IMX461, Samsung HP1) enabling simulated grids up to 48×48 qubits.
+- **Auto-Calibration & Diagnostics**: Automated tools for mapping laser spots to pixels and verifying hardware health.
+- **QFT Specialization**: Implements QFT-based period finding for integers.
+- **CLI Interface**: Robust command-line tools for calibration, diagnostics, and algorithm demonstration.
 - **Modular Design**: Separate PCBs for main logic and VCSEL array, with optical setup for hBN substrate.
 
 ## Hardware Requirements
@@ -21,7 +25,7 @@ The system requires custom hardware assembly. Below is a detailed Bill of Materi
 | Nº   | Component                           | Reference | Value / Model                        | Quantity | Main Function                                                                     | Typical Footprint (KiCad)     | Notes / Important Observations                                                                    |
 |------|-------------------------------------|-----------|--------------------------------------|----------|-----------------------------------------------------------------------------------|-------------------------------|---------------------------------------------------------------------------------------------------|
 | 1    | Xilinx Artix-7 FPGA                 | U1        | XC7A35T-1CPG236C                     | 1        | Central control, signal generation, UART, laser timing and RF synthesizer        | CSG236 (BGA 236 balls, 0.8 mm pitch) | System core. Power: 1.0 V core, 1.8 V auxiliaries, 3.3 V I/O. SPI interface for ADF4351.         |
-| 2    | Omnivision CMOS Camera              | U2        | OV7670 (complete module with lens)   | 1        | Capture of fluorescence from hBN sites                                            | QFN-24 4×4 mm P0.4 mm + EPAD | 8-bit parallel output, XCLK clock 24 MHz, SCCB interface (I²C-like). Configure for grayscale mode for fluorescence. |
+| 2    | High-Resolution Image Sensor        | U2        | Consumer-grade 50-200MP sensor       | 1        | High-resolution fluorescence capture for ≥48 qubit discrimination                 | Bare sensor or dev board      | **Options**: Samsung ISOCELL HP1/HP3 (200MP, 12000×9248), Sony IMX461 (100MP), Sony IMX455 (61MP). Higher resolution enables larger qubit grids (up to 48×48). Use macro lens or microscope objective for focusing. |
 | 3    | Microwave PLL Synthesizer           | U3        | ADF4351BCPZ                          | 1        | Generation of RF pulses for spin manipulation (35 MHz–4.4 GHz, supports 2–3 GHz) | LFCSP-32 5×5 mm P0.5 mm     | 3.3 V power. SPI interface. REF_IN clock up to 250 MHz. Supports fast hopping for pulses. Output ~0 dBm. |
 | 4    | 8×8 VCSEL Array (Custom PCB)        | U4        | 8×8 VCSEL Array (~532 nm, custom PCB)| 1        | Sequential illumination of the 64 hBN sites                                       | Custom PCB with PinHeader 2×8 / 4×4 grid | Each VCSEL ≈5 mA, Vf ≈2.0–2.2 V. Separate PCB connected via J4. Coherent array preferable.       |
 | 5    | Limiting Resistors (VCSEL)          | R1–R64    | 270 Ω ±1% 1/10 W                     | 64       | Current limitation per VCSEL (3.3 V – 2.0 V) / 5 mA ≈260 Ω →270 Ω                | 0603 (1608 metric)           | One per each VCSEL diode. 1% tolerance for brightness uniformity.                                 |
