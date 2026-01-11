@@ -119,26 +119,25 @@ class MongoDBClient:
         self.client.close()
 
 class CalibrationManager:
-    # /**
-    #  * Manages calibration of laser to camera mapping.
-    #  * @param {LaserArrayController} laser_ctrl - Laser controller instance.
-    #  * @param {CameraInterface} camera - Camera interface instance.
-    #  */
-    def __init__(self, laser_ctrl: LaserArrayController, camera: CameraInterface):
+    """
+    Manages calibration of laser to camera mapping.
+    Supports auto-calibration, validation, and multiple storage backends.
+    """
+    def __init__(self, laser_ctrl: LaserArrayController, camera):
         self.laser_ctrl = laser_ctrl
         self.camera = camera
         self.mapping: Dict[Tuple[int, int], Tuple[int, int]] = {}
+        self.grid_size = (8, 8)  # Default, can be updated
 
-    # /**
-    #  * Performs calibration by firing lasers and detecting positions.
-    #  * @param {int} min_area - Minimum contour area for detection.
-    #  * @param {float} thresh - Threshold for binary image.
-    #  */
-    def perform_calibration(self, min_area: int = 100, thresh: float = 50):
-        for row in range(8):
-            for col in range(8):
+    def perform_calibration(self, min_area: int = 100, thresh: float = 50, grid_size: Tuple[int, int] = (8, 8)):
+        """
+        Manual calibration by firing lasers and detecting positions.
+        """
+        self.grid_size = grid_size
+        for row in range(grid_size[0]):
+            for col in range(grid_size[1]):
                 self.laser_ctrl.fire_laser(row, col)
-                time.sleep(0.1)  # Delay for stabilization
+                time.sleep(0.1)
                 image = self.camera.capture_image()
                 gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) > 2 else image
                 _, binary = cv2.threshold(gray, thresh, 255, cv2.THRESH_BINARY)
@@ -155,25 +154,132 @@ class CalibrationManager:
                         break
                 if not found:
                     logger.warning(f"No contour found for ({row}, {col})")
-                time.sleep(0.5)
-        if len(self.mapping) < 64:
-            logger.warning("Incomplete calibration; some sites missing.")
+                time.sleep(0.1)
+        expected = grid_size[0] * grid_size[1]
+        if len(self.mapping) < expected:
+            logger.warning(f"Incomplete calibration: {len(self.mapping)}/{expected} sites found.")
         logger.info("Calibration complete.")
+        return self.mapping
 
-    # /**
-    #  * Saves mapping to MongoDB.
-    #  * @param {MongoDBClient} db - Database client.
-    #  * @param {str} file_id - Identifier.
-    #  */
+    def auto_calibrate(self, grid_size: Tuple[int, int] = (8, 8), adaptive_thresh: bool = True) -> Dict:
+        """
+        Automatic calibration with adaptive thresholding.
+        Returns detailed results including success rate.
+        """
+        self.grid_size = grid_size
+        self.mapping = {}
+        results = {'found': 0, 'missing': [], 'positions': {}}
+        
+        # Capture background first
+        background = self.camera.capture_image()
+        bg_mean = np.mean(background)
+        
+        for row in range(grid_size[0]):
+            for col in range(grid_size[1]):
+                self.laser_ctrl.fire_laser(row, col, duration_ms=100)
+                time.sleep(0.15)
+                
+                image = self.camera.capture_image()
+                gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) > 2 else image
+                
+                # Subtract background
+                diff = cv2.absdiff(gray, background.astype(np.uint8) if len(background.shape) == 2 else cv2.cvtColor(background, cv2.COLOR_BGR2GRAY))
+                
+                # Adaptive or fixed threshold
+                if adaptive_thresh:
+                    thresh_val = max(30, np.mean(diff) + 2 * np.std(diff))
+                else:
+                    thresh_val = 50
+                
+                _, binary = cv2.threshold(diff, thresh_val, 255, cv2.THRESH_BINARY)
+                contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                
+                found = False
+                for contour in sorted(contours, key=cv2.contourArea, reverse=True):
+                    if cv2.contourArea(contour) > 50:
+                        M = cv2.moments(contour)
+                        if M["m00"] != 0:
+                            cx = int(M["m10"] / M["m00"])
+                            cy = int(M["m01"] / M["m00"])
+                            self.mapping[(row, col)] = (cx, cy)
+                            results['positions'][(row, col)] = (cx, cy)
+                            results['found'] += 1
+                            found = True
+                        break
+                
+                if not found:
+                    results['missing'].append((row, col))
+                    logger.warning(f"Auto-cal: No spot found for ({row}, {col})")
+        
+        expected = grid_size[0] * grid_size[1]
+        results['total'] = expected
+        results['success_rate'] = results['found'] / expected * 100
+        
+        logger.info(f"Auto-calibration complete: {results['found']}/{expected} ({results['success_rate']:.1f}%)")
+        return results
+
+    def validate_calibration(self) -> Dict:
+        """Validate calibration quality and detect issues."""
+        if not self.mapping:
+            return {'valid': False, 'error': 'No calibration data'}
+        
+        issues = []
+        expected = self.grid_size[0] * self.grid_size[1]
+        
+        # Check coverage
+        coverage = len(self.mapping) / expected * 100
+        if coverage < 100:
+            issues.append(f"Missing {expected - len(self.mapping)} sites")
+        
+        # Check for duplicate positions (collision)
+        positions = list(self.mapping.values())
+        if len(positions) != len(set(positions)):
+            issues.append("Duplicate pixel positions detected")
+        
+        # Check spacing uniformity
+        if len(self.mapping) >= 4:
+            xs = [p[0] for p in self.mapping.values()]
+            ys = [p[1] for p in self.mapping.values()]
+            x_spread = max(xs) - min(xs)
+            y_spread = max(ys) - min(ys)
+            if x_spread < 100 or y_spread < 100:
+                issues.append("Positions clustered too tightly")
+        
+        return {
+            'valid': len(issues) == 0,
+            'coverage': coverage,
+            'issues': issues,
+            'site_count': len(self.mapping),
+            'grid_size': self.grid_size
+        }
+
+    def save_mapping_file(self, path: str):
+        """Save calibration to JSON file."""
+        import json
+        str_mapping = {f"{k[0]}_{k[1]}": list(v) for k, v in self.mapping.items()}
+        data = {'grid_size': self.grid_size, 'mapping': str_mapping}
+        with open(path, 'w') as f:
+            json.dump(data, f, indent=2)
+        logger.info(f"Calibration saved to {path}")
+
+    def load_mapping_file(self, path: str):
+        """Load calibration from JSON file."""
+        import json
+        with open(path, 'r') as f:
+            data = json.load(f)
+        self.grid_size = tuple(data.get('grid_size', (8, 8)))
+        self.mapping = {}
+        for k, v in data['mapping'].items():
+            row, col = map(int, k.split('_'))
+            self.mapping[(row, col)] = tuple(v)
+        logger.info(f"Calibration loaded from {path}: {len(self.mapping)} sites")
+
     def save_mapping(self, db: MongoDBClient, file_id: str = 'default'):
+        """Save mapping to MongoDB."""
         db.save_mapping(self.mapping, file_id)
 
-    # /**
-    #  * Loads mapping from MongoDB.
-    #  * @param {MongoDBClient} db - Database client.
-    #  * @param {str} file_id - Identifier.
-    #  */
     def load_mapping(self, db: MongoDBClient, file_id: str = 'default'):
+        """Load mapping from MongoDB."""
         self.mapping = db.load_mapping(file_id)
 
 class QubitImageProcessor:

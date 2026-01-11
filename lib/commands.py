@@ -2,6 +2,7 @@
 import logging
 import time
 import serial
+import json
 from rich.console import Console
 from rich.table import Table
 import pyfiglet
@@ -10,6 +11,8 @@ from lib.core import MongoDBClient, CalibrationManager, QubitImageProcessor, Har
 from lib.hardware import FPGAConnection, LaserArrayController, CameraInterface, MicrowaveController
 from lib.simulator import SimulatedFPGAConnection
 from lib.circuits import create_period_finding_circuit, create_math_circuit, create_powmod_circuit, create_shor_circuit, create_modinv_circuit, create_factor_15_circuit
+from lib.camera import CameraManager, CameraBase, SimulatedCamera, USBCamera, CAMERA_PRESETS
+from lib.laser import LaserManager, LaserBase, SimulatedLaser, FPGALaserArray, LASER_PRESETS
 from fractions import Fraction
 from math import gcd
 
@@ -453,3 +456,187 @@ def register_commands(cli):
             readline.read_history_file(history_file)
         atexit.register(readline.write_history_file, history_file)
         QNOSConsole(locals_dict).interact()
+
+    @cli.command('detect-cameras')
+    def detect_cameras():
+        """Scan and list all connected cameras (USB, CSI, FPGA, CCD)."""
+        rich_console.print("[bold cyan]Scanning for cameras...[/bold cyan]")
+        cameras = CameraManager.detect_cameras()
+        
+        table = Table(title="📷 Detected Cameras")
+        table.add_column("Type", style="cyan")
+        table.add_column("Name", style="green")
+        table.add_column("Resolution", style="yellow")
+        table.add_column("Sensor", style="magenta")
+        table.add_column("Max Grid", style="blue")
+        table.add_column("Device", style="dim")
+        
+        for cam in cameras:
+            table.add_row(
+                cam.camera_type,
+                cam.name,
+                f"{cam.resolution[1]}×{cam.resolution[0]}",
+                cam.sensor_type if hasattr(cam, 'sensor_type') else 'cmos',
+                f"{cam.max_qubit_grid[0]}×{cam.max_qubit_grid[1]}",
+                cam.device_path or '-'
+            )
+        
+        rich_console.print(table)
+        rich_console.print(f"\n[dim]Supported presets: {', '.join(CAMERA_PRESETS.keys())}[/dim]")
+
+    @cli.command('detect-lasers')
+    @click.option('--port', default='/dev/ttyUSB0', help='FPGA port for laser detection.')
+    @click.option('--mock', is_flag=True, help='Use simulated connection.')
+    def detect_lasers(port, mock):
+        """Scan and list all laser arrays (VCSEL, LED, fiber-coupled)."""
+        rich_console.print("[bold cyan]Scanning for laser arrays...[/bold cyan]")
+        
+        fpga = SimulatedFPGAConnection() if mock else None
+        if not mock:
+            try:
+                fpga = FPGAConnection(port)
+            except Exception as e:
+                rich_console.print(f"[yellow]FPGA not connected: {e}[/yellow]")
+        
+        lasers = LaserManager.detect_lasers(fpga)
+        
+        table = Table(title="🔦 Detected Laser Arrays")
+        table.add_column("Type", style="cyan")
+        table.add_column("Name", style="green")
+        table.add_column("Wavelength", style="yellow")
+        table.add_column("Grid", style="magenta")
+        table.add_column("Connection", style="blue")
+        
+        for laser in lasers:
+            table.add_row(
+                laser.laser_type,
+                laser.name,
+                f"{laser.wavelength_nm}nm",
+                f"{laser.grid_size[0]}×{laser.grid_size[1]}",
+                laser.connection_type
+            )
+        
+        rich_console.print(table)
+        rich_console.print(f"\n[dim]Supported presets: {', '.join(LASER_PRESETS.keys())}[/dim]")
+        
+        if fpga:
+            fpga.close()
+
+    @cli.command()
+    @click.option('--camera-type', type=click.Choice(['auto', 'usb', 'simulated']), default='simulated')
+    @click.option('--laser-type', type=click.Choice(['auto', 'vcsel', 'simulated']), default='simulated')
+    @click.option('--output', type=click.Path(), help='Save diagnostics to JSON file.')
+    def diagnose(camera_type, laser_type, output):
+        """Run diagnostics on camera and laser systems."""
+        rich_console.print("[bold cyan]Running hardware diagnostics...[/bold cyan]\n")
+        
+        results = {'camera': None, 'laser': None}
+        
+        # Camera diagnostics
+        try:
+            if camera_type == 'simulated':
+                camera = SimulatedCamera()
+            elif camera_type == 'usb':
+                camera = USBCamera(device_id=0)
+            else:
+                camera = SimulatedCamera()  # Fallback
+            
+            cam_results = CameraManager.run_diagnostics(camera)
+            results['camera'] = cam_results
+            
+            table = Table(title="📷 Camera Diagnostics")
+            table.add_column("Test", style="cyan")
+            table.add_column("Status", style="green")
+            table.add_column("Details", style="dim")
+            
+            for test_name, test_result in cam_results['tests'].items():
+                status = test_result.get('status', 'UNKNOWN')
+                status_style = 'green' if status == 'PASS' else ('yellow' if status == 'WARN' else 'red')
+                details = str({k: v for k, v in test_result.items() if k != 'status'})[:50]
+                table.add_row(test_name, f"[{status_style}]{status}[/{status_style}]", details)
+            
+            rich_console.print(table)
+            camera.close()
+        except Exception as e:
+            rich_console.print(f"[red]Camera diagnostics failed: {e}[/red]")
+        
+        # Laser diagnostics
+        try:
+            if laser_type == 'simulated':
+                laser = SimulatedLaser()
+            else:
+                laser = SimulatedLaser()  # Fallback
+            
+            laser_results = LaserManager.run_diagnostics(laser, camera=None)
+            results['laser'] = laser_results
+            
+            table = Table(title="🔦 Laser Diagnostics")
+            table.add_column("Test", style="cyan")
+            table.add_column("Status", style="green")
+            table.add_column("Details", style="dim")
+            
+            for test_name, test_result in laser_results['tests'].items():
+                status = test_result.get('status', 'UNKNOWN')
+                status_style = 'green' if status == 'PASS' else ('yellow' if status == 'WARN' else 'red')
+                details = str({k: v for k, v in test_result.items() if k != 'status'})[:50]
+                table.add_row(test_name, f"[{status_style}]{status}[/{status_style}]", details)
+            
+            rich_console.print(table)
+            laser.close()
+        except Exception as e:
+            rich_console.print(f"[red]Laser diagnostics failed: {e}[/red]")
+        
+        # Save to file if requested
+        if output:
+            with open(output, 'w') as f:
+                json.dump(results, f, indent=2, default=str)
+            rich_console.print(f"\n[green]Diagnostics saved to {output}[/green]")
+
+    @cli.command('auto-calibrate')
+    @click.option('--grid-size', default='8x8', help='Grid size (e.g., 8x8, 16x16).')
+    @click.option('--output', type=click.Path(), default='calibration.json', help='Output calibration file.')
+    @click.option('--mock-hardware', is_flag=True, help='Use simulated hardware.')
+    def auto_calibrate(grid_size, output, mock_hardware):
+        """Auto-calibrate laser-to-camera mapping."""
+        rows, cols = map(int, grid_size.lower().split('x'))
+        rich_console.print(f"[bold cyan]Starting auto-calibration ({rows}×{cols} grid)...[/bold cyan]")
+        
+        try:
+            if mock_hardware:
+                from lib.simulator import SimulatedFPGAConnection
+                fpga = SimulatedFPGAConnection()
+            else:
+                fpga = FPGAConnection()
+            
+            laser = LaserArrayController(fpga)
+            camera = CameraInterface(fpga)
+            cal = CalibrationManager(laser, camera)
+            
+            results = cal.auto_calibrate(grid_size=(rows, cols))
+            
+            # Display results
+            table = Table(title="📐 Auto-Calibration Results")
+            table.add_column("Metric", style="cyan")
+            table.add_column("Value", style="green")
+            table.add_row("Sites Found", f"{results['found']}/{results['total']}")
+            table.add_row("Success Rate", f"{results['success_rate']:.1f}%")
+            table.add_row("Missing Sites", str(len(results['missing'])))
+            rich_console.print(table)
+            
+            if results['missing']:
+                rich_console.print(f"[yellow]Missing: {results['missing'][:5]}...[/yellow]")
+            
+            # Save calibration
+            cal.save_mapping_file(output)
+            rich_console.print(f"\n[green]✓ Calibration saved to {output}[/green]")
+            
+            # Validate
+            validation = cal.validate_calibration()
+            if validation['valid']:
+                rich_console.print("[green]✓ Calibration validated successfully[/green]")
+            else:
+                rich_console.print(f"[yellow]⚠ Validation issues: {validation['issues']}[/yellow]")
+            
+            fpga.close()
+        except Exception as e:
+            rich_console.print(f"[red]Auto-calibration failed: {e}[/red]")
