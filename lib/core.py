@@ -623,6 +623,7 @@ class QNOSBackend(BackendV2):
                 'shots': 1,
                 'success': True,
                 'data': {'counts': {final_bitstring: 1}},
+                'header': {'name': circuit.name}
             }]
         ) 
 
