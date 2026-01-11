@@ -7,6 +7,82 @@ from qiskit.circuit.library.standard_gates import RYGate, PhaseGate
 from qiskit.circuit.library import UnitaryGate
 from fractions import Fraction
 
+def create_factor_15_circuit():
+    """
+    Creates an optimized Shor circuit specifically for factoring N=15.
+    
+    This is a 4-qubit implementation that demonstrates period finding for a=7 mod 15.
+    The period r=4 leads to factors: gcd(7^2 - 1, 15) = 3 and gcd(7^2 + 1, 15) = 5.
+    
+    This circuit is designed to work within the coherence limits of hBN spin defects
+    (~2µs T2) by using minimal gate depth.
+    
+    @returns {tuple} (QuantumCircuit, metadata dict with a, N, expected_period)
+    """
+    # For N=15, a=7: period r=4
+    # 7^1 mod 15 = 7
+    # 7^2 mod 15 = 4
+    # 7^3 mod 15 = 13
+    # 7^4 mod 15 = 1 (period found!)
+    
+    N = 15
+    a = 7
+    expected_period = 4
+    
+    # Use 4 counting qubits (enough precision for period 4)
+    # and 4 work qubits (to hold values mod 15)
+    n_count = 4
+    n_work = 4
+    
+    qr_count = QuantumRegister(n_count, 'count')
+    qr_work = QuantumRegister(n_work, 'work')
+    cr = ClassicalRegister(n_count, 'meas')
+    
+    qc = QuantumCircuit(qr_count, qr_work, cr)
+    
+    # Initialize work register to |1⟩
+    qc.x(qr_work[0])
+    
+    # Apply Hadamard to counting qubits
+    qc.h(qr_count)
+    
+    # Controlled modular multiplication U^(2^k) where U|x⟩ = |ax mod N⟩
+    # For a=7, N=15, we use the simplified swap-based implementation
+    
+    # U^1 (controlled by count[0]): multiply by 7 mod 15
+    # 7 ≡ -8 mod 15, so we can use controlled swaps + negation
+    qc.cswap(qr_count[0], qr_work[0], qr_work[2])
+    qc.cswap(qr_count[0], qr_work[1], qr_work[3])
+    qc.cx(qr_count[0], qr_work[0])
+    qc.cx(qr_count[0], qr_work[1])
+    
+    # U^2 (controlled by count[1]): multiply by 7^2 = 49 ≡ 4 mod 15
+    qc.cswap(qr_count[1], qr_work[0], qr_work[2])
+    
+    # U^4 (controlled by count[2]): multiply by 7^4 = 2401 ≡ 1 mod 15 (identity)
+    # No operation needed
+    
+    # U^8 (controlled by count[3]): multiply by 7^8 ≡ 1 mod 15 (identity)
+    # No operation needed
+    
+    # Inverse QFT on counting register
+    qc.append(QFT(n_count, inverse=True), qr_count)
+    
+    # Measure counting qubits
+    qc.measure(qr_count, cr)
+    
+    metadata = {
+        'N': N,
+        'a': a,
+        'expected_period': expected_period,
+        'expected_factors': (3, 5),
+        'qubit_count': n_count + n_work,
+        'gate_depth_estimate': 20  # Approximate gate count
+    }
+    
+    return qc, metadata
+
+
 def create_period_finding_circuit(n, a):
     """
     Creates the period finding circuit using proper unitary for modular exponentiation.
